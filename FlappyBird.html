@@ -2,20 +2,35 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Flappy Bird">
+  <meta name="theme-color" content="#1a1a2e">
   <title>Flappy Bird</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
+    html, body {
       background: #1a1a2e;
       display: flex;
       justify-content: center;
-      align-items: flex-start;
-      min-height: 100vh;
-      padding: 10px 0;
+      align-items: center;
+      width: 100%;
+      height: 100%;
+      height: 100dvh;
+      overflow: hidden;
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
       font-family: 'Segoe UI', sans-serif;
-      overflow-y: auto;
     }
-    canvas { border: 3px solid #e94560; border-radius: 8px; box-shadow: 0 0 30px rgba(233,69,96,0.4); }
+    canvas {
+      border: 3px solid #e94560;
+      border-radius: 8px;
+      box-shadow: 0 0 30px rgba(233,69,96,0.4);
+      display: block;
+      /* taille visuelle gérée par JS */
+    }
   </style>
 </head>
 <body>
@@ -24,11 +39,30 @@
     const canvas = document.getElementById('canvas');
     const ctx = canvas.getContext('2d');
 
+    // ─── RESPONSIVE CANVAS ───────────────────────────────────────────────────────
+    // Le canvas interne reste 400×600 ; on scale l'élément CSS pour remplir l'écran.
+    function resizeCanvas() {
+      const sw = window.innerWidth;
+      const sh = window.innerHeight;
+      const aspect = canvas.width / canvas.height; // 400/600
+      let dw, dh;
+      if (sw / sh < aspect) {
+        dw = sw; dh = sw / aspect;
+      } else {
+        dh = sh; dw = sh * aspect;
+      }
+      canvas.style.width  = dw + 'px';
+      canvas.style.height = dh + 'px';
+    }
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+    window.addEventListener('orientationchange', () => setTimeout(resizeCanvas, 100));
+
     const GRAVITY = 0.13;
     const FLAP = -4.8;
     const PIPE_WIDTH = 60;
     const PIPE_GAP = 200;
-    const PIPE_SPEED = 1.8;
+    const PIPE_SPEED = 5.0;
     const PIPE_INTERVAL = 150;
 
     const SKINS = [
@@ -89,30 +123,6 @@
       return null;
     }
 
-    // ─── MISSIONS ────────────────────────────────────────────────────────────────
-
-    const MISSIONS = [
-      { id: 'score5',        desc: 'Atteindre un score de 5',                  reward: 5,  check: (s) => s.score >= 5 },
-      { id: 'score15',       desc: 'Atteindre un score de 15',                 reward: 10, check: (s) => s.score >= 15 },
-      { id: 'score30',       desc: 'Atteindre un score de 30',                 reward: 20, check: (s) => s.score >= 30 },
-      { id: 'score50',       desc: 'Atteindre un score de 50',                 reward: 35, check: (s) => s.score >= 50 },
-      { id: 'coins5',        desc: 'Ramasser 5 pièces en une partie',          reward: 8,  check: (s) => s.coins >= 5 },
-      { id: 'coins15',       desc: 'Ramasser 15 pièces en une partie',         reward: 20, check: (s) => s.coins >= 15 },
-      { id: 'nocoins10',     desc: 'Score de 10 sans ramasser de pièce',       reward: 15, check: (s) => s.score >= 10 && s.coins === 0 },
-      { id: 'lowfly',        desc: 'Score de 8 en restant sous la moitié',     reward: 15, check: (s) => s.score >= 8 && s.alwaysLow },
-      { id: 'totalcoins50',  desc: 'Accumuler 50 pièces au total',             reward: 10, check: (s) => s.totalCoins >= 50 },
-      { id: 'totalcoins200', desc: 'Accumuler 200 pièces au total',            reward: 25, check: (s) => s.totalCoins >= 200 },
-      { id: 'buy3skins',     desc: 'Débloquer 3 personnages payants',          reward: 15, check: (s) => s.unlockedSkins > 5 + 2 },
-      { id: 'buy3themes',    desc: 'Débloquer 3 thèmes payants',              reward: 15, check: (s) => s.unlockedThemes > 2 + 2 },
-      { id: 'perfectrun',    desc: 'Score de 20 sans toucher le haut/bas',     reward: 25, check: (s) => s.score >= 20 && s.neverEdge },
-    ];
-
-    let completedMissions, missionScroll;
-    let missionsJustCompleted = [];
-
-    // Per-run tracking
-    let flapsSincePipe, maxNoFlap, alwaysLow, neverEdge;
-
     let totalCoins, bestScore, unlockedSkins, unlockedThemes, selectedThemeIdx;
 
     function loadData() {
@@ -127,9 +137,6 @@
       if (!unlockedThemes.includes(1)) unlockedThemes.push(1);
       selectedThemeIdx  = parseInt(localStorage.getItem('flappyTheme') || '1');
       if (!unlockedThemes.includes(selectedThemeIdx)) selectedThemeIdx = 1;
-      const savedMissions = localStorage.getItem('flappyMissions');
-      completedMissions = savedMissions ? JSON.parse(savedMissions) : [];
-      missionScroll = 0;
     }
 
     function saveData() {
@@ -138,7 +145,6 @@
       localStorage.setItem('flappyUnlocked',       JSON.stringify(unlockedSkins));
       localStorage.setItem('flappyUnlockedThemes', JSON.stringify(unlockedThemes));
       localStorage.setItem('flappyTheme',          String(selectedThemeIdx));
-      localStorage.setItem('flappyMissions',       JSON.stringify(completedMissions));
     }
     loadData();
 
@@ -161,7 +167,7 @@
     let deathFrozen = false;
 
     function currentSkin() { return SKINS[unlockedSkins[selectedSkinPos]]; }
-    function speed() { return PIPE_SPEED + score * 0.08; }
+    function speed() { return PIPE_SPEED + score * 0.2 + score * score * 0.008; }
 
     function init() {
       bird = { x: 80, y: 250, vy: 0, radius: 16 };
@@ -169,8 +175,6 @@
       score = 0; coinsThisRun = 0; frameCount = 0;
       particles = []; scorePopups = [];
       screenShake = 0; deathRotation = 0; deathVy = 0; deathFrozen = false;
-      flapsSincePipe = 0; maxNoFlap = 0; alwaysLow = true; neverEdge = true;
-      missionsJustCompleted = [];
     }
 
     // ─── BACKGROUNDS ─────────────────────────────────────────────────────────────
@@ -1155,19 +1159,6 @@
       ctx.font = 'bold 16px Segoe UI'; ctx.fillStyle = '#FFF';
       ctx.fillText('BOUTIQUE', canvas.width/2, 332);
 
-      // Missions button
-      ctx.fillStyle = 'rgba(255,255,255,0.15)';
-      drawRoundedRect(canvas.width/2-80, 362, 160, 40, 12); ctx.fill();
-      ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = 1.5;
-      drawRoundedRect(canvas.width/2-80, 362, 160, 40, 12); ctx.stroke();
-      ctx.font = 'bold 16px Segoe UI'; ctx.fillStyle = '#FFF';
-      ctx.fillText('MISSIONS', canvas.width/2, 382);
-      if (completedMissions.length > 0) {
-        ctx.fillStyle = '#4CAF50';
-        ctx.beginPath(); ctx.arc(canvas.width/2+72, 365, 11, 0, Math.PI*2); ctx.fill();
-        ctx.font = 'bold 11px Segoe UI'; ctx.fillStyle = '#FFF';
-        ctx.fillText(String(completedMissions.length), canvas.width/2+72, 366);
-      }
       // Rank & best score
       if (bestScore) {
         const rank = getRank(bestScore);
@@ -1290,88 +1281,6 @@
       drawRoundedRect(canvas.width/2-70, 544, 140, 40, 10); ctx.fill();
       ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = 1; ctx.stroke();
       ctx.font = 'bold 16px Segoe UI'; ctx.fillStyle = '#FFF';
-      ctx.fillText('Retour', canvas.width/2, 564);
-    }
-
-    // ─── MISSIONS ────────────────────────────────────────────────────────────────
-
-    function drawMissions() {
-      drawBackground();
-      drawDarkBg();
-      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-
-      ctx.font = 'bold 26px Segoe UI'; ctx.fillStyle = '#FFD700';
-      ctx.strokeStyle = '#000'; ctx.lineWidth = 3;
-      ctx.strokeText('MISSIONS', canvas.width/2, 35);
-      ctx.fillText('MISSIONS', canvas.width/2, 35);
-
-      const done = completedMissions.length;
-      ctx.font = '13px Segoe UI'; ctx.fillStyle = 'rgba(255,255,255,0.5)';
-      ctx.fillText(done + ' / ' + MISSIONS.length + ' complétées', canvas.width/2, 58);
-
-      // Progress bar
-      ctx.fillStyle = 'rgba(255,255,255,0.1)';
-      drawRoundedRect(60, 68, 280, 8, 4); ctx.fill();
-      ctx.fillStyle = '#4CAF50';
-      drawRoundedRect(60, 68, Math.max(8, 280 * done / MISSIONS.length), 8, 4); ctx.fill();
-
-      // Scrollable mission list
-      ctx.save();
-      ctx.beginPath(); ctx.rect(0, 84, canvas.width, 450); ctx.clip();
-
-      MISSIONS.forEach((m, i) => {
-        const y = 92 + i * 56 - missionScroll;
-        if (y < 40 || y > 540) return;
-        const isDone = completedMissions.includes(m.id);
-
-        ctx.fillStyle = isDone ? 'rgba(76,175,80,0.12)' : 'rgba(255,255,255,0.06)';
-        drawRoundedRect(20, y, 360, 48, 10); ctx.fill();
-        if (isDone) {
-          ctx.strokeStyle = 'rgba(76,175,80,0.3)'; ctx.lineWidth = 1;
-          drawRoundedRect(20, y, 360, 48, 10); ctx.stroke();
-        }
-
-        // Check/lock icon
-        ctx.font = '18px Segoe UI';
-        ctx.fillStyle = isDone ? '#4CAF50' : 'rgba(255,255,255,0.3)';
-        ctx.textAlign = 'center';
-        ctx.fillText(isDone ? '✓' : '○', 42, y + 24);
-
-        // Description
-        ctx.textAlign = 'left';
-        ctx.font = isDone ? '13px Segoe UI' : 'bold 13px Segoe UI';
-        ctx.fillStyle = isDone ? 'rgba(255,255,255,0.5)' : '#FFF';
-        ctx.fillText(m.desc, 60, y + 20);
-
-        // Reward
-        ctx.font = '12px Segoe UI';
-        ctx.fillStyle = isDone ? 'rgba(255,215,0,0.4)' : '#FFD700';
-        ctx.fillText(isDone ? 'Complétée' : '+' + m.reward + ' pièces', 60, y + 38);
-
-        // Reward coin icon (if not done)
-        if (!isDone) {
-          drawCoinSprite(350, y + 24, 8);
-        }
-      });
-
-      ctx.restore();
-
-      // Scroll arrows
-      const maxScroll = Math.max(0, MISSIONS.length * 56 - 440);
-      if (missionScroll > 0) {
-        ctx.fillStyle = 'rgba(255,255,255,0.6)'; ctx.font = 'bold 18px Segoe UI';
-        ctx.textAlign = 'center'; ctx.fillText('▲', canvas.width/2, 90);
-      }
-      if (missionScroll < maxScroll) {
-        ctx.fillStyle = 'rgba(255,255,255,0.6)'; ctx.font = 'bold 18px Segoe UI';
-        ctx.textAlign = 'center'; ctx.fillText('▼', canvas.width/2, 536);
-      }
-
-      // Back button
-      ctx.fillStyle = 'rgba(255,255,255,0.15)';
-      drawRoundedRect(canvas.width/2-70, 544, 140, 40, 10); ctx.fill();
-      ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = 1; ctx.stroke();
-      ctx.textAlign = 'center'; ctx.font = 'bold 16px Segoe UI'; ctx.fillStyle = '#FFF';
       ctx.fillText('Retour', canvas.width/2, 564);
     }
 
@@ -1542,8 +1451,7 @@
       drawCoins(); drawBird(); drawDarkBg();
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
 
-      const hasMissions = missionsJustCompleted.length > 0;
-      const panelH = hasMissions ? 360 + missionsJustCompleted.length * 28 : 300;
+      const panelH = 300;
       const panelY = Math.max(60, 300 - panelH / 2);
 
       ctx.fillStyle = 'rgba(20,20,40,0.9)';
@@ -1583,23 +1491,6 @@
       ctx.strokeStyle = '#000'; ctx.lineWidth = 2;
       ctx.strokeText('+'+coinsThisRun+' pieces', canvas.width/2+10, cy);
       ctx.fillText('+'+coinsThisRun+' pieces', canvas.width/2+10, cy);
-
-      // Missions completed this run
-      if (hasMissions) {
-        cy += 32;
-        ctx.font = 'bold 14px Segoe UI'; ctx.fillStyle = '#4CAF50';
-        ctx.fillText('Missions complétées !', canvas.width/2, cy);
-        missionsJustCompleted.forEach(m => {
-          cy += 26;
-          ctx.fillStyle = 'rgba(76,175,80,0.15)';
-          drawRoundedRect(60, cy-12, 280, 24, 6); ctx.fill();
-          ctx.font = '12px Segoe UI'; ctx.fillStyle = '#FFF'; ctx.textAlign = 'left';
-          ctx.fillText('✓ ' + m.desc, 70, cy);
-          ctx.fillStyle = '#FFD700'; ctx.textAlign = 'right';
-          ctx.fillText('+' + m.reward + '$', 330, cy);
-          ctx.textAlign = 'center';
-        });
-      }
 
       cy += 32;
       ctx.fillStyle = '#FFD700';
@@ -1650,9 +1541,6 @@
         if (!p.passed && p.x + PIPE_WIDTH < bird.x) {
           p.passed = true; score++;
           addScorePopup('+1', bird.x, bird.y - 30, '#FFF');
-          if (flapsSincePipe === 0) maxNoFlap++;
-          else maxNoFlap = Math.max(maxNoFlap, 0);
-          flapsSincePipe = 0;
         }
       });
       pipes = pipes.filter(p => p.x + PIPE_WIDTH > -20);
@@ -1669,10 +1557,6 @@
         return c.x + 20 > 0;
       });
 
-      // Mission tracking
-      if (bird.y < canvas.height / 2) alwaysLow = false;
-      if (bird.y - bird.radius < 30 || bird.y + bird.radius > canvas.height - 70) neverEdge = false;
-
       if (bird.y + bird.radius > canvas.height - 40 || bird.y - bird.radius < 0) { die(); return; }
       for (const p of pipes) {
         if (bird.x+bird.radius-4 > p.x+4 && bird.x-bird.radius+4 < p.x+PIPE_WIDTH-4) {
@@ -1685,20 +1569,6 @@
       state = 'dead';
       if (!bestScore || score > bestScore) bestScore = score;
       totalCoins += coinsThisRun;
-
-      // Check missions
-      const runStats = {
-        score, coins: coinsThisRun, maxNoFlap, alwaysLow, neverEdge,
-        totalCoins, unlockedSkins: unlockedSkins.length, unlockedThemes: unlockedThemes.length,
-      };
-      missionsJustCompleted = [];
-      MISSIONS.forEach(m => {
-        if (!completedMissions.includes(m.id) && m.check(runStats)) {
-          completedMissions.push(m.id);
-          totalCoins += m.reward;
-          missionsJustCompleted.push(m);
-        }
-      });
 
       saveData();
       spawnDeathParticles();
@@ -1727,7 +1597,6 @@
       if      (state === 'skin')      drawSkinMenu();
       else if (state === 'shop')      drawShop();
       else if (state === 'settings')  drawSettings();
-      else if (state === 'missions')  drawMissions();
       else if (state === 'countdown') drawCountdown();
       else if (state === 'playing') {
         drawBackground();
@@ -1754,7 +1623,7 @@
 
     // ─── INPUT ────────────────────────────────────────────────────────────────────
 
-    function flap() { if (state === 'playing') { bird.vy = FLAP; flapsSincePipe++; } }
+    function flap() { if (state === 'playing') { bird.vy = FLAP; } }
 
     function startHold() {
       if (state !== 'playing') return;
@@ -1779,21 +1648,9 @@
         else if (mx>=canvas.width/2-80 && mx<=canvas.width/2+80 && my>=312 && my<=352) {
           shopTab = 'skins'; state = 'shop';
         }
-        else if (mx>=canvas.width/2-80 && mx<=canvas.width/2+80 && my>=362 && my<=402) {
-          missionScroll = 0; state = 'missions';
-        }
         else if (mx>=canvas.width-50 && mx<=canvas.width-10 && my>=10 && my<=50) {
           confirmReset = false; state = 'settings';
         }
-      }
-
-      else if (state === 'missions') {
-        if (mx>=canvas.width/2-70 && mx<=canvas.width/2+70 && my>=544 && my<=584) {
-          state = 'skin';
-        }
-        const maxScroll = Math.max(0, MISSIONS.length * 56 - 440);
-        if (my < 95 && missionScroll > 0) missionScroll = Math.max(0, missionScroll - 150);
-        else if (my > 520 && my < 544 && missionScroll < maxScroll) missionScroll = Math.min(maxScroll, missionScroll + 150);
       }
 
       else if (state === 'settings') {
@@ -1814,7 +1671,6 @@
             localStorage.removeItem('flappyUnlocked');
             localStorage.removeItem('flappyUnlockedThemes');
             localStorage.removeItem('flappyTheme');
-            localStorage.removeItem('flappyMissions');
             loadData();
             selectedSkinPos = 0;
             confirmReset = false;
@@ -1867,11 +1723,9 @@
 
       else if (state === 'dead') {
         // Compute button positions same as drawGameOver
-        const hasMissions = missionsJustCompleted.length > 0;
-        const panelH = hasMissions ? 360 + missionsJustCompleted.length * 28 : 300;
+        const panelH = 300;
         const panelY = Math.max(60, 300 - panelH / 2);
         let bcy = panelY + 40 + 35 + 30 + (bestScore ? 28 : 0) + 30 + 32;
-        if (hasMissions) bcy += 32 + missionsJustCompleted.length * 26;
         // Rejouer button
         if (mx>=canvas.width/2-80 && mx<=canvas.width/2+80 && my>=bcy && my<=bcy+44) {
           init(); countdownStart = Date.now(); state = 'countdown';
@@ -1885,12 +1739,55 @@
     canvas.addEventListener('mouseup', stopHold);
     canvas.addEventListener('mouseleave', stopHold);
 
+    // ─── TOUCH ───────────────────────────────────────────────────────────────────
+    let touchStartY = 0;
+    let touchStartX = 0;
+    let touchMoved  = false;
+
+    function getTouchCoords(t) {
+      const rect = canvas.getBoundingClientRect();
+      return {
+        mx: (t.clientX - rect.left) * (canvas.width  / rect.width),
+        my: (t.clientY - rect.top)  * (canvas.height / rect.height),
+      };
+    }
+
     canvas.addEventListener('touchstart', (e) => {
       e.preventDefault();
       const t = e.touches[0];
-      canvas.dispatchEvent(new MouseEvent('mousedown', { clientX: t.clientX, clientY: t.clientY }));
+      touchStartY = t.clientY;
+      touchStartX = t.clientX;
+      touchMoved  = false;
+      // Simule mousedown pour toute la logique de clic existante
+      canvas.dispatchEvent(new MouseEvent('mousedown', { clientX: t.clientX, clientY: t.clientY, bubbles: true }));
     }, { passive: false });
-    canvas.addEventListener('touchend', (e) => { e.preventDefault(); stopHold(); }, { passive: false });
+
+    canvas.addEventListener('touchmove', (e) => {
+      e.preventDefault();
+      const t = e.touches[0];
+      const dy = touchStartY - t.clientY;
+      const dx = touchStartX - t.clientX;
+      if (Math.abs(dy) > 5 || Math.abs(dx) > 5) touchMoved = true;
+
+      // Swipe scroll dans boutique et missions
+      const rect = canvas.getBoundingClientRect();
+      const scale = canvas.height / rect.height;
+      const scaledDy = dy * scale;
+
+      if (state === 'shop') {
+        const maxScroll = shopTab === 'skins'
+          ? Math.max(0, SKINS.filter(s=>s.price>0).length * 68 - 410)
+          : Math.max(0, THEMES.length * 82 - 410);
+        shopScroll = Math.max(0, Math.min(maxScroll, shopScroll + scaledDy * 0.6));
+      }
+      touchStartY = t.clientY;
+      touchStartX = t.clientX;
+    }, { passive: false });
+
+    canvas.addEventListener('touchend', (e) => {
+      e.preventDefault();
+      stopHold();
+    }, { passive: false });
 
     canvas.addEventListener('wheel', (e) => {
       if (state === 'shop') {
@@ -1899,16 +1796,18 @@
           ? Math.max(0, SKINS.filter(s=>s.price>0).length * 68 - 410)
           : Math.max(0, THEMES.length * 82 - 410);
         shopScroll = Math.max(0, Math.min(maxScroll, shopScroll + e.deltaY * 0.5));
-      } else if (state === 'missions') {
-        e.preventDefault();
-        const maxScroll = Math.max(0, MISSIONS.length * 56 - 440);
-        missionScroll = Math.max(0, Math.min(maxScroll, missionScroll + e.deltaY * 0.5));
       }
     }, { passive: false });
 
     document.addEventListener('keydown', (e) => {
       if (e.code === 'Space' || e.code === 'ArrowUp') { e.preventDefault(); if (state==='playing') flap(); }
     });
+
+    // Empêche le scroll/bounce natif d'iOS sur tout le document
+    document.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
+    document.addEventListener('touchstart', (e) => {
+      if (e.target !== canvas) e.preventDefault();
+    }, { passive: false });
 
     init();
     state = 'skin';
