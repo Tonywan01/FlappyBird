@@ -159,6 +159,7 @@
 
     // Animation state
     let wingAngle = 0;
+    let menuFrame = 0;
     let particles = [];
     let scorePopups = [];
     let screenShake = 0;
@@ -187,7 +188,9 @@
       ctx.fillStyle = sky;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.fillStyle = 'rgba(255,255,255,0.85)';
-      [[60,80,40],[160,50,30],[280,90,50],[340,60,35]].forEach(([x,y,r]) => {
+      const cloudScroll = (menuFrame * 0.25) % (canvas.width + 120);
+      [[60,80,40],[190,48,28],[310,85,48],[450,58,33],[540,72,38]].forEach(([bx,y,r]) => {
+        const x = ((bx - cloudScroll + canvas.width + 120) % (canvas.width + 120)) - 60;
         ctx.beginPath();
         ctx.arc(x, y, r, 0, Math.PI*2);
         ctx.arc(x+r*0.6, y-r*0.3, r*0.7, 0, Math.PI*2);
@@ -1102,10 +1105,24 @@
       drawDarkBg();
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
 
+      // Floating ambient stars
+      [[55,310],[345,255],[75,465],[325,415],[185,390],[155,490],[370,350],[30,200]].forEach(([sx,sy],i) => {
+        const t = menuFrame * 0.018 + i * 1.3;
+        ctx.globalAlpha = 0.15 + Math.sin(t) * 0.12;
+        const sz = 1.5 + Math.sin(t * 1.4) * 0.8;
+        ctx.fillStyle = i % 2 === 0 ? '#FFD700' : '#FFF';
+        ctx.beginPath(); ctx.arc(sx, sy + Math.sin(t * 0.6) * 7, sz, 0, Math.PI*2); ctx.fill();
+      });
+      ctx.globalAlpha = 1;
+
+      // Title with pulsing glow
+      const titleGlow = 10 + Math.sin(menuFrame * 0.06) * 7;
+      ctx.shadowColor = '#FFD700'; ctx.shadowBlur = titleGlow;
       ctx.font = 'bold 30px Segoe UI'; ctx.fillStyle = '#FFD700';
       ctx.strokeStyle = '#000'; ctx.lineWidth = 3;
       ctx.strokeText('FLAPPY BIRD', canvas.width/2, 48);
       ctx.fillText('FLAPPY BIRD', canvas.width/2, 48);
+      ctx.shadowBlur = 0;
 
       ctx.font = '14px Segoe UI'; ctx.fillStyle = '#ccc';
       ctx.fillText('Choisissez votre oiseau', canvas.width/2, 75);
@@ -1118,9 +1135,21 @@
       ctx.strokeText(String(totalCoins) + ' pièces', canvas.width/2+10, 102);
       ctx.fillText(String(totalCoins) + ' pièces', canvas.width/2+10, 102);
 
-      // Bird preview
+      // Bird preview with idle animation
       const skinIdx = unlockedSkins[selectedSkinPos];
-      drawBirdAt(canvas.width/2, 165, SKINS[skinIdx], 28);
+      const idleY = 165 + Math.sin(menuFrame * 0.04) * 5;
+      wingAngle += 0.15;
+
+      // Glow ring behind bird
+      const ringAlpha = 0.12 + Math.sin(menuFrame * 0.07) * 0.08;
+      const ringR = 40 + Math.sin(menuFrame * 0.05) * 4;
+      const ringGrad = ctx.createRadialGradient(canvas.width/2, idleY, 8, canvas.width/2, idleY, ringR);
+      ringGrad.addColorStop(0, `rgba(255,215,0,${ringAlpha * 2})`);
+      ringGrad.addColorStop(1, 'rgba(255,215,0,0)');
+      ctx.fillStyle = ringGrad;
+      ctx.beginPath(); ctx.arc(canvas.width/2, idleY, ringR, 0, Math.PI*2); ctx.fill();
+
+      drawBirdAt(canvas.width/2, idleY, SKINS[skinIdx], 28, true);
 
       ctx.textAlign = 'center';
       ctx.font = 'bold 18px Segoe UI'; ctx.fillStyle = '#FFF';
@@ -1145,11 +1174,19 @@
         ctx.fillStyle = i===selectedSkinPos ? '#FFD700' : 'rgba(255,255,255,0.4)'; ctx.fill();
       }
 
-      // Play button
+      // Play button with pulse
+      const pulse = 1 + 0.025 * Math.sin(menuFrame * 0.09);
+      ctx.save();
+      ctx.translate(canvas.width/2, 275);
+      ctx.scale(pulse, pulse);
+      ctx.translate(-canvas.width/2, -275);
+      ctx.shadowColor = '#FFD700'; ctx.shadowBlur = 8 + Math.sin(menuFrame * 0.09) * 5;
       ctx.fillStyle = '#FFD700';
       drawRoundedRect(canvas.width/2-80, 252, 160, 46, 12); ctx.fill();
+      ctx.shadowBlur = 0;
       ctx.font = 'bold 20px Segoe UI'; ctx.fillStyle = '#222';
       ctx.fillText('▶  JOUER', canvas.width/2, 275);
+      ctx.restore();
 
       // Shop button
       ctx.fillStyle = 'rgba(255,255,255,0.15)';
@@ -1582,6 +1619,7 @@
 
     function loop() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
+      menuFrame++;
 
       // Screen shake
       let shaking = screenShake > 0;
